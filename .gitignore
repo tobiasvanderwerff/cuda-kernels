@@ -54,3 +54,4 @@
 *.cmd
 
 tags
+.*.swp

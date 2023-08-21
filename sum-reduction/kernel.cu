@@ -23,18 +23,8 @@ __global__ void reduction(float *out, float *in, unsigned size)
 
     // Let each thread load 2 elements into shared memory (coalesced),
     // making sure to fill up the entire shared array.
-    // Element 1
-    if (start + tx < size) {
-        partial_sum[tx] = in[start + tx];
-    } else {
-        partial_sum[tx] = 0;
-    }
-    // Element 2
-    if (start + tx + bd < size) {
-        partial_sum[tx + bd] = in[start + tx + bd];
-    } else {
-        partial_sum[tx + bd] = 0;
-    }
+    partial_sum[tx] = start + tx < size ? in[start + tx] : 0;
+    partial_sum[tx + bd] = start + tx + bd < size ? in[start + tx + bd] : 0;
     __syncthreads();
 
     // Traverse the reduction tree until all elements are added together
