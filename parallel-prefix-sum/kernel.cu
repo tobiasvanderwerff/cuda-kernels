@@ -29,17 +29,25 @@ __global__ void partial_scan(float *out, float *in, float *sums, unsigned int in
     // Load the input array from global into shared memory
     temp[tx]    = (start+tx < in_size) ? in[start+tx] : 0;
     temp[tx+bd] = (start+tx+bd < in_size) ? in[start+tx+bd] : 0;
-    __syncthreads();
+
+    // TODO (optimization): no. of threads within a warp are reduced by a factor of 2
+    // each iteration, which is inefficient. Fix this.
+    // TODO (optimization): address bank conflicts by using padding in 'temp'. See the
+    // Nvidia doc mentioned at the top of this file for an example using a
+    // CONFLICT_FREE_OFFSET macro.
 
     // Up-sweep (reduce) phase
     for (int i = 0; i < log2((double)n); i++) {
+        __syncthreads();
         int pw = powf(2, i);
         if (tx % pw == 0) {
-            temp[2*tx + 2*pw - 1] += temp[2*tx + pw - 1];
+            int ix1 = 2*tx + pw - 1;
+            int ix2 = 2*tx + 2*pw - 1;
+            temp[ix2] += temp[ix1];
         }
-        __syncthreads();
     }
 
+    __syncthreads();
     if (tx == 0) {
         // Store the total sum
         int ix = (start+n < in_size) ? n-1 : in_size % n - 1;
@@ -47,9 +55,10 @@ __global__ void partial_scan(float *out, float *in, float *sums, unsigned int in
         // Set last element to 0 for down-sweep
         temp[n-1] = 0;
     }
-    __syncthreads();
+
     // Down-sweep phase
     for (int i = log2((double)n)-1; i >= 0; i--) {
+        __syncthreads();
         int pw = powf(2, i);
         if (tx % pw == 0) {
             int ix1 = 2*tx + pw - 1;
@@ -58,10 +67,10 @@ __global__ void partial_scan(float *out, float *in, float *sums, unsigned int in
             temp[ix1] = temp[ix2];
             temp[ix2] += t;
         }
-        __syncthreads();
     }
 
     // Write the result
+    __syncthreads();
     if (start+tx < in_size)
         out[start+tx] = temp[tx];
     if (start+tx+bd < in_size)
