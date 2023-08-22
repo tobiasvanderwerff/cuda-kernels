@@ -34,7 +34,11 @@ __global__ void partial_scan(float *out, float *in, float *sums, unsigned int in
     // each iteration, which is inefficient. Fix this.
     // TODO (optimization): address bank conflicts by using padding in 'temp'. See the
     // Nvidia doc mentioned at the top of this file for an example using a
-    // CONFLICT_FREE_OFFSET macro.
+    // CONFLICT_FREE_OFFSET macro. Something to keep in mind: It is mentioned in this video
+    // (https://youtu.be/CZgM3DEBplE?t=830) that bank conflicts are not always a big
+    // deal, since shared memory reads are so fast, and the scheduler can also optimize
+    // it away by switching to another warp while the banks figure out the requested
+    // data
 
     // Up-sweep (reduce) phase
     for (int i = 0; i < log2((double)n); i++) {
@@ -105,25 +109,25 @@ void preScan(float *out, float *in, unsigned int in_size)
     cuda_ret = cudaMalloc((void**)&incr, nblocks*sizeof(float));
     if (cuda_ret != cudaSuccess) FATAL("Failed to allocate memory for 'incr'");
 
-    dim3 gridDim, blockDim;
+    unsigned int gridDim, blockDim;
 
     // Calculate prefix sum on a block-by-block basis
-    gridDim = dim3(nblocks, 1, 1);
-    blockDim = dim3(BLOCK_SIZE, 1, 1);
+    gridDim = nblocks;
+    blockDim = BLOCK_SIZE;
     partial_scan<<< gridDim, blockDim >>>(out, in, sums, in_size);
 
     cudaDeviceSynchronize();
 
     // Calculate increments
-    gridDim = dim3((nblocks-1)/BLOCK_SIZE + 1, 1, 1);
-    blockDim = dim3(BLOCK_SIZE, 1, 1);
+    gridDim = (nblocks-1)/BLOCK_SIZE + 1;
+    blockDim = BLOCK_SIZE;
     partial_scan<<< gridDim, blockDim  >>>(incr, sums, sums, nblocks);
 
     cudaDeviceSynchronize();
 
     // Add increments to block results
-    gridDim = dim3(nblocks, 1, 1);
-    blockDim = dim3(2*BLOCK_SIZE, 1, 1);
+    gridDim = nblocks;
+    blockDim = 2*BLOCK_SIZE;
     uniform_add<<< gridDim, blockDim >>>(out, out, incr, in_size);
 
     cudaDeviceSynchronize();
