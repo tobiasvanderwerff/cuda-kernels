@@ -6,21 +6,20 @@
  *cr
  ******************************************************************************/
 #define NTHREADS_HOST 256
-#define ELEMENTS_PER_THREAD 8192
 
 // Define your kernels in this file you may use more than one kernel if you
 // need to
 
 __global__ void histogram_kernel_interleaved_shared(unsigned int* input, unsigned int* bins,
              unsigned int num_elements, unsigned int num_bins) {
-		
-    const unsigned int start = blockIdx.x*blockDim.x + threadIdx.x;
-    const unsigned int stride = NTHREADS_HOST; 
-    unsigned int end = start + stride*ELEMENTS_PER_THREAD + 1;
-    if (end > num_elements) end = num_elements;
+
+    const unsigned int tx = threadIdx.x, bx = blockIdx.x, 
+                       bdim = blockDim.x, gdim = gridDim.x;
+    const unsigned int start = bx*bdim + tx;
+    const unsigned int stride = bdim*gdim;
 
     int i = start;
-    while (i < end) {
+    while (i < num_elements) {
         unsigned int val = input[i];
         if (val < num_bins) {
             atomicAdd(&(bins[val]), 1);
@@ -64,7 +63,7 @@ void histogram(unsigned int* input, uint8_t* bins, unsigned int num_elements,
 	
     // Launch histogram kernel using 32-bit bins
     int nthreads = NTHREADS_HOST;
-    int nblocks = (num_elements-1)/(NTHREADS_HOST * ELEMENTS_PER_THREAD) + 1;
+    int nblocks = (num_elements-1)/nthreads + 1;
     histogram_kernel_interleaved_shared<<<nblocks, nthreads>>>(input, bins32, num_elements, num_bins); 
 	
     cudaDeviceSynchronize();
