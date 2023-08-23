@@ -5,7 +5,7 @@
  *cr                         All Rights Reserved
  *cr
  ******************************************************************************/
-int NTHREADS_HOST = 256;
+#define NTHREADS_HOST 256
 #define ELEMENTS_PER_THREAD 8192
 
 // Define your kernels in this file you may use more than one kernel if you
@@ -14,16 +14,18 @@ int NTHREADS_HOST = 256;
 __global__ void histogram_kernel_interleaved_shared(unsigned int* input, unsigned int* bins,
              unsigned int num_elements, unsigned int num_bins) {
 		
-    unsigned int start = ELEMENTS_PER_THREAD * (blockIdx.x*blockDim.x + threadIdx.x);
-    unsigned int end = ELEMENTS_PER_THREAD * (blockIdx.x*blockDim.x + threadIdx.x + 1);
+    const unsigned int start = blockIdx.x*blockDim.x + threadIdx.x;
+    const unsigned int stride = NTHREADS_HOST; 
+    unsigned int end = start + stride*ELEMENTS_PER_THREAD + 1;
     if (end > num_elements) end = num_elements;
 
     int i = start;
     while (i < end) {
-        unsigned int val = input[i++];
+        unsigned int val = input[i];
         if (val < num_bins) {
             atomicAdd(&(bins[val]), 1);
         }
+        i += stride;
     }
 }
 
