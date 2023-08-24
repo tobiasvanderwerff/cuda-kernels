@@ -51,7 +51,7 @@ possible are performing useful work.
 Instead of all threads trying to write directly to global memory (which requires atomic
 adds, which means many threads will be stalled), each thread block maintains a local
 version of the histogram (an example of the
-[privatization](https://en.wikipedia.org/wiki/Privatization_(computer_programming)
+[privatization](https://en.wikipedia.org/wiki/Privatization_(computer_programming))
 technique). Each thread in a block first writes to the block-specific histogram, leading
 to less traffic and higher throughput on those local histograms. Then, all blocks merge
 their partial histograms into the global memory histogram. This leads to fewer total
@@ -87,5 +87,5 @@ situation-dependent, depending in particular on the number of bins of the output
 histogram.
 
 ### Performance
-**Runtime over 5 runs**: 0.819ms
+**Runtime over 5 runs**: 0.819ms  
 **Speed-up vs naive**: 17.7x
