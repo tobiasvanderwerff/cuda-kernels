@@ -6,25 +6,39 @@
  *cr
  ******************************************************************************/
 #define NTHREADS_HOST 256
+#define NUM_BINS 4096
 
 // Define your kernels in this file you may use more than one kernel if you
 // need to
 
 __global__ void histogram_kernel_interleaved_shared(unsigned int* input, unsigned int* bins,
              unsigned int num_elements, unsigned int num_bins) {
+    __shared__ unsigned int Sbins[NUM_BINS];  // private copy of the histogram
 
     const unsigned int tx = threadIdx.x, bx = blockIdx.x, 
                        bdim = blockDim.x, gdim = gridDim.x;
     const unsigned int start = bx*bdim + tx;
     const unsigned int stride = bdim*gdim;
 
+    // Set shared memory values
+    for (int i = tx; i < NUM_BINS; i += bdim)
+        Sbins[i] = 0;
+    __syncthreads();
+
+    // Update histogram values
     int i = start;
     while (i < num_elements) {
         unsigned int val = input[i];
-        if (val < num_bins) {
-            atomicAdd(&(bins[val]), 1);
+        if (val < NUM_BINS) {
+            atomicAdd(&(Sbins[val]), 1);
         }
         i += stride;
+    }
+
+    // Merge partial histogram into global memory
+    __syncthreads();
+    for (int i = tx; i < NUM_BINS; i += bdim) {
+        atomicAdd(&(bins[i]), Sbins[i]);
     }
 }
 
