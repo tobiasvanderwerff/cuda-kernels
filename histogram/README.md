@@ -27,7 +27,7 @@ and sharing them among threads, using only a single read.
 
 
 ## Optimization 2: use more threads and less work per thread
-[Commit link]()
+[Commit link](https://github.com/tobiasvanderwerff/cuda-kernels/commit/e92e441b615b08bd3134c62269547c51107835f8)
 
 ### Description
 The naive implementation started with each thread computing a fixed
@@ -43,7 +43,7 @@ possible are performing useful work.
 
 
 ## Optimization 3: shared memory
-[Commit link]()
+[Commit link](https://github.com/tobiasvanderwerff/cuda-kernels/commit/09ea898ad203ede867e10dc53da9120f515dd058)
 
 ### Description
 Instead of all threads trying to write directly to global memory (which
