@@ -57,3 +57,11 @@ tags
 .*.swp
 
 TODO.txt
+
+# InfOli assignment
+infoli/parallel/infoli_simple
+infoli/parallel/results/*
+infoli/parallel_copy/
+infoli/serial/InferiorOlive_Output.txt
+infoli/serial/infoli_simple
+infoli/serial/results/*

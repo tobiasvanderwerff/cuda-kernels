@@ -67,21 +67,21 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
     printf("Error: Couldn't open file %s\n", conFile);
     exit(EXIT_FAILURE);
   }
+
+  mod_prec cond_value = CONDUCTANCE;
+  if (ALLTOALL == 0) {
+    // reading into a temporary float, because fscanf apparently doesn't
+    // read into mod_prec
+    float temp_cond_value;
+    fscanf(pConFile, "%f ", &temp_cond_value);
+    fclose(pConFile);
+    cond_value = (mod_prec)temp_cond_value;
+  }
+
   // handle connectivity file parsing so that each cell knows what it needs
   printf("Reading Network Connectivity Data\n");
   for (int line_counter = 0; line_counter < cellCount; line_counter++) {
     for (int i = 0; i < cellCount; i++) {
-      mod_prec cond_value;
-      if (ALLTOALL == 0) {
-        // reading into a temporary float, because fscanf apparently doesn't
-        // read into mod_prec
-        float temp_cond_value;
-        fscanf(pConFile, "%f ", &temp_cond_value);
-        cond_value = (mod_prec)temp_cond_value;
-
-      } else {
-        cond_value = CONDUCTANCE;
-      }
       // this connection is considered not existing if conductance = 0
       if (cond_value != 0) {
         // part of the code handling RECEIVING and noting which of my cells
@@ -150,8 +150,6 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
       }
     }
   }
-
-  fclose(pConFile);
 }
 
 /**
