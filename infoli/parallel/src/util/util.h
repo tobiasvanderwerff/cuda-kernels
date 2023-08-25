@@ -36,5 +36,6 @@ typedef unsigned long long timestamp_t;
 timestamp_t getTimeStamp();
 
 int *allocIntArr(int *pointer, int existing_slots);
+void cudaSuccessOrExit(cudaError_t err);
 
 mod_prec *allocModArr(mod_prec *pointer, int existing_slots);

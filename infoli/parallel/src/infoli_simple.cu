@@ -30,6 +30,17 @@ CellState **allocCellPtr(int cellCount) {
   return cellPtr;
 }
 
+CellState *allocCellPtrCUDA(int cellCount) {
+  // Note that instead of returning a 2D array (double pointer) with dimensions
+  // arr[2][cellCount], we return a 1D array (single pointer) of size
+  // 2*cellCount. This is because it's annoying to allocate a double pointer on
+  // the CUDA device, and I didn't figure out how to do it properly.
+  CellState* cellPtr_d;
+  cudaError_t err = cudaMalloc((void**) &cellPtr_d, 2 * cellCount * sizeof(CellState));
+  cudaSuccessOrExit(err);
+  return cellPtr_d;
+}
+
 /**
  * Allocates memory for the cellParamsPtr
  *
@@ -51,6 +62,13 @@ CellCompParams *allocCellParams(int cellCount) {
   return cellParamsPtr;
 }
 
+CellCompParams *allocCellParamsCUDA(int cellCount) { 
+  CellCompParams* cellParamsPtr_d;
+  cudaError_t err = cudaMalloc((void**) &cellParamsPtr_d, cellCount * sizeof(CellCompParams));
+  cudaSuccessOrExit(err);
+  return cellParamsPtr_d;
+}
+
 /**
  * Sets the initial state of the simulation
  * Does this by reading from the file specified in conFile
@@ -62,14 +80,13 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
     cellParamsPtr[i].total_amount_of_neighbours = 0;
   }
 
-  FILE *pConFile = fopen(conFile, "r");
-  if (pConFile == NULL) {
-    printf("Error: Couldn't open file %s\n", conFile);
-    exit(EXIT_FAILURE);
-  }
-
   mod_prec cond_value = CONDUCTANCE;
   if (ALLTOALL == 0) {
+    FILE *pConFile = fopen(conFile, "r");
+    if (pConFile == NULL) {
+      printf("Error: Couldn't open file %s\n", conFile);
+      exit(EXIT_FAILURE);
+    }
     // reading into a temporary float, because fscanf apparently doesn't
     // read into mod_prec
     float temp_cond_value;
@@ -80,6 +97,8 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
 
   // handle connectivity file parsing so that each cell knows what it needs
   printf("Reading Network Connectivity Data\n");
+  // TODO <TVDW>: I think this loop could be put on GPU, especially if I can
+  // keep the initialized data there
   for (int line_counter = 0; line_counter < cellCount; line_counter++) {
     for (int i = 0; i < cellCount; i++) {
       // this connection is considered not existing if conductance = 0
@@ -112,7 +131,7 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
   printf("int: %d, dend: %d, soma: %d, axon: %d, cellstate: %d\n", sizeof(int), sizeof(Dend), sizeof(Soma),
          sizeof(Axon), sizeof(CellState));
   // Initialise cellPtr[0] with appropriate values
-  initState(cellPtr[0], cellCount);
+  initState(cellPtr[0], cellCount); // TODO <TVDW>: could be moved to GPU
   if (G_CAL_FROM_FILE) {
     readGCalFromFile(cellPtr[0], cellCount);
   }
@@ -197,6 +216,7 @@ void performSimulation(CellCompParams *cellParamsPtr, CellState **cellPtr, int c
  * Starts and times the simulation
  */
 void simulate(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount) {
+
   printf("Beginning Execution\n");
   if (ALLTOALL == 1) {
     printf("All-to-All Connectivity Benchmark Active\n");

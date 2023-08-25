@@ -20,3 +20,10 @@ timestamp_t getTimeStamp() {
   gettimeofday(&now, NULL);
   return now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
 }
+
+void cudaSuccessOrExit(cudaError_t err) {
+  if (err != cudaSuccess) {
+    fprintf(stderr, "CUDA Error: %s\n", cudaGetErrorString(err));
+    exit(EXIT_FAILURE);
+  }
+}

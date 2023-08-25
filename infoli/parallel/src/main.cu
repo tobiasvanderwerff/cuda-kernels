@@ -49,9 +49,17 @@ int main(int argc, char *argv[]) {
   CellState **cellPtr = allocCellPtr(cellCount);
   CellCompParams *cellParamsPtr = allocCellParams(cellCount);
 
+  // CUDA Setup 
+  CellCompParams* cellParamsPtr_d = allocCellParamsCUDA(cellCount);
+  CellState* cellPtr_d = allocCellPtrCUDA(cellCount);
+
+  cudaDeviceSynchronize();
+
+
   // Init network
   char conFile[BUFF_SIZE];
   sprintf(conFile, CONFIG_FILE_NAME);
+  // TODO <TVDW>: Go over 'init' again after doing 'simulate'
   init(conFile, cellParamsPtr, cellPtr, cellCount);
 
   // Perform simulation
@@ -62,6 +70,9 @@ int main(int argc, char *argv[]) {
   free(cellPtr[1]);
   free(cellPtr);
   free(cellParamsPtr);
+
+  cudaFree(cellParamsPtr_d);
+  cudaFree(cellPtr_d);
 
   return 0;
 }
