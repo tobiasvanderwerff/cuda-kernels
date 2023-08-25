@@ -30,14 +30,25 @@ CellState **allocCellPtr(int cellCount) {
   return cellPtr;
 }
 
-CellState *allocCellPtrCUDA(int cellCount) {
+CellState *allocAndCopyCellPtrCUDA(int cellCount, CellState** cellPtr) {
   // Note that instead of returning a 2D array (double pointer) with dimensions
   // arr[2][cellCount], we return a 1D array (single pointer) of size
   // 2*cellCount. This is because it's annoying to allocate a double pointer on
-  // the CUDA device, and I didn't figure out how to do it properly.
+  // the CUDA device, and I couldn't figure out how to do it properly.
+
   CellState* cellPtr_d;
-  cudaError_t err = cudaMalloc((void**) &cellPtr_d, 2 * cellCount * sizeof(CellState));
-  cudaSuccessOrExit(err);
+  cudaError_t err;
+
+  const size_t rowsize = size_t(cellCount) * sizeof(CellState);
+  err = cudaMalloc((void**) &cellPtr_d, 2*rowsize);
+  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  // Copy first row
+  err = cudaMemcpy(cellPtr_d, cellPtr[0], rowsize, cudaMemcpyHostToDevice);
+  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  // Copy second row
+  err = cudaMemcpy(cellPtr_d+cellCount, cellPtr[1], rowsize, cudaMemcpyHostToDevice);
+  cudaSuccessOrExit(err, __FILE__, __LINE__);
+
   return cellPtr_d;
 }
 
@@ -62,10 +73,16 @@ CellCompParams *allocCellParams(int cellCount) {
   return cellParamsPtr;
 }
 
-CellCompParams *allocCellParamsCUDA(int cellCount) { 
+CellCompParams *allocAndCopyCellParamsCUDA(int cellCount, CellCompParams* cellParamsPtr) { 
+  cudaError_t err;
   CellCompParams* cellParamsPtr_d;
-  cudaError_t err = cudaMalloc((void**) &cellParamsPtr_d, cellCount * sizeof(CellCompParams));
-  cudaSuccessOrExit(err);
+
+  const unsigned int memsize = cellCount * sizeof(CellCompParams);
+  err = cudaMalloc((void**) &cellParamsPtr_d, memsize);
+  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  err = cudaMemcpy(cellParamsPtr_d, cellParamsPtr, memsize, cudaMemcpyHostToDevice);
+  cudaSuccessOrExit(err, __FILE__, __LINE__);
+
   return cellParamsPtr_d;
 }
 
@@ -177,7 +194,10 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
  * Iterates over all time steps in the simulation and performs the various
  * calculations This is the actual iteration
  */
-void performSimulation(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount, int totalSimSteps) {
+// void performSimulation(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount, int totalSimSteps) {
+void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
+                       CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
+                       int cellCount, int totalSimSteps) {
   for (int simStep = 0; simStep < totalSimSteps; simStep++) {
     mod_prec iApp;
     int simArrayId = simStep % 2;
@@ -191,22 +211,38 @@ void performSimulation(CellCompParams *cellParamsPtr, CellState **cellPtr, int c
      * core dendrite communication with connected cells
      * See definition for more details
      */
-    communicationStep(cellParamsPtr, cellPtr[simArrayId], cellCount);
+    unsigned int gridDim = BLOCK_SIZE;
+    unsigned int blockDim = cellCount * cellCount;
+    communicationStep<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
+    // communicationStep(cellParamsPtr, cellPtr[simArrayId], cellCount);
+
+    cudaDeviceSynchronize();
+
+    // Copy device data back to host 
+    cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
+    cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
+    cudaMemcpy(cellPtr_h[1], cellPtr_d+cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
 
     for (int targetCell = 0; targetCell < cellCount; targetCell++) {
-      CellCompParams *currParams = &cellParamsPtr[targetCell];
+      CellCompParams *currParams = &cellParamsPtr_h[targetCell];
 
       /* we simulate a hardcoded input pulse here
        * that differs from step to step
        */
       currParams->iAppIn = iApp;
-      currParams->prevCellState = &cellPtr[simArrayId][targetCell];
-      currParams->newCellState = &cellPtr[simArrayId ^ 1][targetCell];
+      currParams->prevCellState = &cellPtr_h[simArrayId][targetCell];
+      currParams->newCellState = &cellPtr_h[simArrayId ^ 1][targetCell];
 
       compDendrite(currParams, 0);
       compSoma(currParams);
       compAxon(currParams);
     }
+    // Copy data from host to device for next loop iteration
+    cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
+    cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
+    cudaMemcpy(cellPtr_d+cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
+    cudaDeviceSynchronize();
   }
 }
 
@@ -215,7 +251,10 @@ void performSimulation(CellCompParams *cellParamsPtr, CellState **cellPtr, int c
  *
  * Starts and times the simulation
  */
-void simulate(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount) {
+// void simulate(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount) {
+void simulate(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
+              CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
+              int cellCount) {
 
   printf("Beginning Execution\n");
   if (ALLTOALL == 1) {
@@ -225,7 +264,8 @@ void simulate(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount)
 
   int totalSimSteps = (int)(SIMTIME / DELTA);
 
-  performSimulation(cellParamsPtr, cellPtr, cellCount, totalSimSteps);
+  // performSimulation(cellParamsPtr, cellPtr, cellCount, totalSimSteps);
+  performSimulation(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
   timestamp_t t1 = getTimeStamp();
   printf(
@@ -239,6 +279,7 @@ void simulate(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount)
     sprintf(resultFileName, PRINT_STATE_LOCATION);
     // simStep%2 here should refer to the cellPtr which has the last state of
     // the network that we calculated
-    printState(cellPtr[totalSimSteps % 2], resultFileName, cellCount);
+    // printState(cellPtr_h + (totalSimSteps % 2)*cellCount, resultFileName, cellCount);
+    printState(cellPtr_h[totalSimSteps%2], resultFileName, cellCount);
   }
 }

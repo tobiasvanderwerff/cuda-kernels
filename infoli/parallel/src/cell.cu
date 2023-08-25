@@ -44,12 +44,25 @@ void initState(CellState *cellPtr, int cellCount) {
 /* The function where the magic happens: using the structures created during
  * initialization, exchange necessary dendritic voltage
  */
-void communicationStep(CellCompParams *params, const CellState *cells,
-                       int cellCount) {
-  for (int j = 0; j < cellCount; j++) {
-    CellCompParams param = params[j];
-    for (int i = 0; i < param.total_amount_of_neighbours; ++i) {
-      param.neighVdend[i] = cells[param.neighId[i]].dend.V_dend;
-    }
+// void communicationStep(CellCompParams *params, const CellState *cells,
+//                        int cellCount) {
+//   for (int j = 0; j < cellCount; j++) {
+//     CellCompParams param = params[j];
+//     for (int i = 0; i < param.total_amount_of_neighbours; ++i) {
+//       param.neighVdend[i] = cells[param.neighId[i]].dend.V_dend;
+//     }
+//   }
+// }
+
+__global__ void communicationStep(CellCompParams *params, const CellState *cells,
+                                  int cellCount) {
+  const unsigned int i = blockIdx.x*blockDim.x * threadIdx.x;
+  const unsigned int row = i / cellCount;
+  const unsigned int col = i % cellCount;
+
+  if (row < cellCount) {
+    CellCompParams param = params[row];
+    if (col < param.total_amount_of_neighbours)
+      param.neighVdend[col] = cells[param.neighId[col]].dend.V_dend;
   }
 }

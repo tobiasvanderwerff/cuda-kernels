@@ -27,6 +27,9 @@
 #define MIN(A, B) A > B ? B : A
 #define BUFF_SIZE 100
 
+// CUDA block size
+#define BLOCK_SIZE 512
+
 // typedef double mod_prec;
 // BE VERY CAREFUL TO CHECK ALL SCANFS TO BE SURE YOU SCAN FOR DOUBLE-POINT
 // ACCURACY, KNOWN ISSUE WITH COND VALUES) AND MPI_TYPES
@@ -36,6 +39,6 @@ typedef unsigned long long timestamp_t;
 timestamp_t getTimeStamp();
 
 int *allocIntArr(int *pointer, int existing_slots);
-void cudaSuccessOrExit(cudaError_t err);
+void cudaSuccessOrExit(cudaError_t err, const char* file, int line);
 
 mod_prec *allocModArr(mod_prec *pointer, int existing_slots);

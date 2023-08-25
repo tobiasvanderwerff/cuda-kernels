@@ -46,33 +46,33 @@ int main(int argc, char *argv[]) {
   int cellCount = atoi(argv[1]);
 
   // Allocate space for network
-  CellState **cellPtr = allocCellPtr(cellCount);
-  CellCompParams *cellParamsPtr = allocCellParams(cellCount);
-
-  // CUDA Setup 
-  CellCompParams* cellParamsPtr_d = allocCellParamsCUDA(cellCount);
-  CellState* cellPtr_d = allocCellPtrCUDA(cellCount);
-
-  cudaDeviceSynchronize();
-
+  CellState **cellPtr_h = allocCellPtr(cellCount);
+  CellCompParams *cellParamsPtr_h = allocCellParams(cellCount);
 
   // Init network
   char conFile[BUFF_SIZE];
   sprintf(conFile, CONFIG_FILE_NAME);
   // TODO <TVDW>: Go over 'init' again after doing 'simulate'
-  init(conFile, cellParamsPtr, cellPtr, cellCount);
+  init(conFile, cellParamsPtr_h, cellPtr_h, cellCount);
+
+  // CUDA Setup 
+  CellState* cellPtr_d = allocAndCopyCellPtrCUDA(cellCount, cellPtr_h);
+  CellCompParams* cellParamsPtr_d = allocAndCopyCellParamsCUDA(cellCount, cellParamsPtr_h);
+
+  cudaDeviceSynchronize();
 
   // Perform simulation
-  simulate(cellParamsPtr, cellPtr, cellCount);
+  // simulate(cellParamsPtr, cellPtr, cellCount);
+  simulate(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
 
   // Clean up
-  free(cellPtr[0]);
-  free(cellPtr[1]);
-  free(cellPtr);
-  free(cellParamsPtr);
+  free(cellPtr_h[0]);
+  free(cellPtr_h[1]);
+  free(cellPtr_h);
+  free(cellParamsPtr_h);
 
-  cudaFree(cellParamsPtr_d);
   cudaFree(cellPtr_d);
+  cudaFree(cellParamsPtr_d);
 
   return 0;
 }

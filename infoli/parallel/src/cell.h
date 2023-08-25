@@ -90,6 +90,6 @@ typedef struct CellCompParams {
 
 /*** FUNCTION PROTOTYPES ***/
 
-void communicationStep(CellCompParams *params, const CellState *cells, int cellCount);
+__global__ void communicationStep(CellCompParams *params, const CellState *cells, int cellCount);
 
 void initState(CellState *cellPtr, int cellCount);

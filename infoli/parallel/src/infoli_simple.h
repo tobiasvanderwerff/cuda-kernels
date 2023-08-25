@@ -50,9 +50,12 @@
 
 /*** TYPEDEFS AND STRUCTS***/
 CellState **allocCellPtr(int cellCount);
-CellState *allocCellPtrCUDA(int cellCount);
+CellState *allocAndCopyCellPtrCUDA(int cellCount, CellState** cellPtr);
 CellCompParams *allocCellParams(int cellCount);
-CellCompParams *allocCellParamsCUDA(int cellCount); 
+CellCompParams *allocAndCopyCellParamsCUDA(int cellCount, CellCompParams* cellParamsPtr); 
 
 void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount);
-void simulate(CellCompParams *cellParamsPtr, CellState **cellPtr, int cellCount);
+// void simulate(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount);
+void simulate(CellCompParams *cellParamsPtr, CellState *cellPtr, 
+              CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
+              int cellCount);
