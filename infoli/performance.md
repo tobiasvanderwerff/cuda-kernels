@@ -1,5 +1,5 @@
 Time in microseconds for different network sizes (horizontal) and code versions
-(vertical):
+(vertical). Speedup is relative to the serial version.
 
 |         | 10      | 100       | 250       | 500       | 750        | 1000       |
 |---------|---------|-----------|-----------|-----------|------------|------------|

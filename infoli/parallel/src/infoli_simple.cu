@@ -213,12 +213,14 @@ __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, 
 
   const int targetCell = blockIdx.x*blockDim.x + threadIdx.x;
 
-  // The reason we divide by 4 instead of 3 is that this way, all sequences of 4
-  // elements will be in the same block, and can synchronize. This is because 4
-  // will always be a multiple of the block size (assuming the block size is a
-  // power of 2!), whereas 3 is not. If you divide by 3, you could have a
-  // situation where e.g. the first 2 elements of a sequence are in block i, but
-  // the last element is in block i+1 (which means you can't synchronize them).
+  // The reason we divide by 4 here instead of 3 is that this way, all sequences
+  // of 4 elements will be in the same block, and can synchronize. This is
+  // because 4 will always be a multiple of the block size (assuming the block
+  // size is a power of 2!), whereas 3 is not. Each fourth thread thus acts as
+  // a padding element. If you divide blocks into sequences of 3, you could have
+  // a situation where e.g. the first 2 elements of a sequence are in block i,
+  // but the last element is in block i+1 (which means you can't synchronize
+  // them).
   if (targetCell / 4 < cellCount) {
     CellCompParams *currParams = &cellParamsPtr[targetCell / 4];
     // TODO: move to shared memory?
@@ -245,7 +247,7 @@ __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, 
         compAxon(currParams);
         break;
       case 3:
-        break;
+        break;  // Ignore the "padding" thread
     }
   }
 }

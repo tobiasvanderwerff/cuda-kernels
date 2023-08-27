@@ -56,9 +56,9 @@ void initState(CellState *cellPtr, int cellCount) {
 
 __global__ void communicationStep(CellCompParams *params, const CellState *cells,
                                   int cellCount) {
-  const unsigned int i = blockIdx.x*blockDim.x * threadIdx.x;
-  const unsigned int row = i / cellCount;
-  const unsigned int col = i % cellCount;
+  const size_t i = blockIdx.x*blockDim.x * threadIdx.x;
+  const size_t row = i / cellCount;
+  const size_t col = i % cellCount;
 
   if (row < cellCount) {
     CellCompParams param = params[row];
