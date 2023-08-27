@@ -1,7 +1,5 @@
 #include "axon.h"
 
-#define CUDA_CALLABLE_FUNCTION __host__ __device__
-
 CUDA_CALLABLE_FUNCTION mod_prec axonSodiumH(mod_prec prevV_axon, mod_prec prevSodium_h_a) {
   // Update axonal Na components
   // NOTE: current has shortened inactivation to account for high
@@ -57,7 +55,7 @@ CUDA_CALLABLE_FUNCTION mod_prec axonCurrVolt(const AxonCurrVoltParams params) {
 
 // update somatic components
 // SCHWEIGHOFER:
-CUDA_CALLABLE_FUNCTION void _compAxon(CellCompParams *cellParamsPtr) {
+CUDA_CALLABLE_FUNCTION void compAxon(CellCompParams *cellParamsPtr) {
   // only axonNew is modified, so that one is a pointer
   Axon *axonNew = &cellParamsPtr->newCellState->axon;
   Axon axonPrev = cellParamsPtr->prevCellState->axon;
@@ -82,12 +80,4 @@ CUDA_CALLABLE_FUNCTION void _compAxon(CellCompParams *cellParamsPtr) {
 
   // Final computation
   axonNew->V_axon = axonCurrVolt(params);
-}
-
-void compAxon(CellCompParams *cellParamsPtr) {
-  _compAxon(cellParamsPtr);
-}
-
-__global__ void compAxonCUDA(CellCompParams *cellParamsPtr) {
-  _compAxon(cellParamsPtr);
 }

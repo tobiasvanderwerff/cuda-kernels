@@ -22,5 +22,6 @@ typedef struct AxonCurrVoltParams {
   mod_prec newVAxon;
 } AxonCurrVoltParams;
 
-void compAxon(CellCompParams *cellParamsPtr);
-__global__ void compAxonCUDA(CellCompParams *cellParamsPtr);
+#define CUDA_CALLABLE_FUNCTION __host__ __device__
+
+CUDA_CALLABLE_FUNCTION void compAxon(CellCompParams *cellParamsPtr);

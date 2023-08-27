@@ -1,7 +1,5 @@
 #include "dendrite.h"
 
-#define CUDA_CALLABLE_FUNCTION __host__ __device__
-
 CUDA_CALLABLE_FUNCTION mod_prec dendHCurr(mod_prec prevV_dend, mod_prec prevHcurrent_q) {
   // Update dendritic H current component
   mod_prec q_inf = 1 / (1 + exp((prevV_dend + 80) / 4));
@@ -88,7 +86,7 @@ CUDA_CALLABLE_FUNCTION mod_prec dendCurrVolt(const DendCurrVoltParams params) {
   return DELTA * dVd_dt + prevV_dend;
 }
 
-CUDA_CALLABLE_FUNCTION void _compDendrite(CellCompParams *cellParamsPtr, const int randomness) {
+CUDA_CALLABLE_FUNCTION void compDendrite(CellCompParams *cellParamsPtr, int randomness) {
   // only dendNew is modified, so that one is a pointer
   Dend *dendNew = &cellParamsPtr->newCellState->dend;
   Dend dendPrev = cellParamsPtr->prevCellState->dend;
@@ -135,12 +133,4 @@ CUDA_CALLABLE_FUNCTION void _compDendrite(CellCompParams *cellParamsPtr, const i
 
   // Final computation
   dendNew->V_dend = dendCurrVolt(params);
-}
-
-void compDendrite(CellCompParams *cellParamsPtr, const int randomness) {
-  _compDendrite(cellParamsPtr, randomness);
-}
-
-__global__ void compDendriteCUDA(CellCompParams *cellParamsPtr, const int randomness) {
-  _compDendrite(cellParamsPtr, randomness);
 }

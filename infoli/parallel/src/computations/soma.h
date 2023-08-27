@@ -44,5 +44,6 @@ typedef struct SomaCurrVoltParams {
   mod_prec newVSoma;
 } SomaCurrVoltParams;
 
-void compSoma(CellCompParams *cellParamsPtr);
-__global__ void compSomaCUDA(CellCompParams *cellParamsPtr);
+#define CUDA_CALLABLE_FUNCTION __host__ __device__
+
+CUDA_CALLABLE_FUNCTION void compSoma(CellCompParams *cellParamsPtr);

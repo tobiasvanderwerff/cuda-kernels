@@ -210,6 +210,27 @@ void copyHostToDevice(
   cudaDeviceSynchronize();
 }
 
+__global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount, mod_prec iApp, int simArrayId) {
+  /* Update all cells in parallel. */
+
+  const size_t targetCell = blockIdx.x*blockDim.x + threadIdx.x;
+
+  if (targetCell < cellCount) {
+    CellCompParams *currParams = &cellParamsPtr[targetCell];
+
+    /* we simulate a hardcoded input pulse here
+      * that differs from step to step
+      */
+    currParams->iAppIn = iApp;
+    currParams->prevCellState = &cellPtr[simArrayId*cellCount + targetCell];
+    currParams->newCellState = &cellPtr[(simArrayId ^ 1)*cellCount + targetCell];
+
+    compDendrite(currParams, 0);
+    compSoma(currParams);
+    compAxon(currParams);
+  }
+}
+
 /**
  * MAIN Loop
  *
@@ -220,6 +241,8 @@ void copyHostToDevice(
 void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
                        CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
                        int cellCount, int totalSimSteps) {
+  // TODO: eventually try to replace this entire loop with a parallelized version (?)
+  copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
   for (int simStep = 0; simStep < totalSimSteps; simStep++) {
     mod_prec iApp;
     int simArrayId = simStep % 2;
@@ -240,37 +263,37 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
 
     cudaDeviceSynchronize();
 
-    // TODO: eventually try to replace this entire loop with a parallelized version 
+    // copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
-    copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+    // TODO: set gridDim and blockDim to proper values
+    update_cells<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
 
-    for (int targetCell = 0; targetCell < cellCount; targetCell++) {
-      CellCompParams *currParams = &cellParamsPtr_h[targetCell];
+    // for (int targetCell = 0; targetCell < cellCount; targetCell++) {
+    //   CellCompParams *currParams = &cellParamsPtr_h[targetCell];
 
-      /* we simulate a hardcoded input pulse here
-       * that differs from step to step
-       */
-      currParams->iAppIn = iApp;
-      currParams->prevCellState = &cellPtr_h[simArrayId][targetCell];
-      currParams->newCellState = &cellPtr_h[simArrayId ^ 1][targetCell];
+    //   /* we simulate a hardcoded input pulse here
+    //    * that differs from step to step
+    //    */
+    //   currParams->iAppIn = iApp;
+    //   currParams->prevCellState = &cellPtr_h[simArrayId][targetCell];
+    //   currParams->newCellState = &cellPtr_h[simArrayId ^ 1][targetCell];
 
-      copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+    //   copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
-      // TODO: set gridDim and blockDim to proper values
-      compDendriteCUDA<<<gridDim, blockDim>>>(currParams, 0);
-      compSomaCUDA<<<gridDim, blockDim>>>(currParams);
-      compAxonCUDA<<<gridDim, blockDim>>>(currParams);
+    //   // TODO: set gridDim and blockDim to proper values
+    //   compDendriteCUDA<<<gridDim, blockDim>>>(currParams, 0);
+    //   compSomaCUDA<<<gridDim, blockDim>>>(currParams);
+    //   compAxonCUDA<<<gridDim, blockDim>>>(currParams);
 
-      copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+    //   copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
-      // compDendrite(currParams, 0);
-      // compSoma(currParams);
-      // compAxon(currParams);
+    //   // compDendrite(currParams, 0);
+    //   // compSoma(currParams);
+    //   // compAxon(currParams);
 
-    }
-    // Copy host->device
-    copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+    // }
   }
+  copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 }
 
 /**

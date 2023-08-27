@@ -1,7 +1,5 @@
 #include "soma.h"
 
-#define CUDA_CALLABLE_FUNCTION __host__ __device__
-
 CUDA_CALLABLE_FUNCTION mod_prec somaCalciumK(mod_prec prevV_soma, mod_prec prevCalcium_k) {
   mod_prec k_inf = (1 / (1 + exp(-1 * (prevV_soma + 61) / 4.2)));
   mod_prec tau_k = 1;
@@ -100,7 +98,7 @@ CUDA_CALLABLE_FUNCTION mod_prec somaCurrVolt(const SomaCurrVoltParams params) {
 
 // update somatic components
 // SCHWEIGHOFER:
-CUDA_CALLABLE_FUNCTION void _compSoma(CellCompParams *cellParamsPtr) {
+CUDA_CALLABLE_FUNCTION void compSoma(CellCompParams *cellParamsPtr) {
   // only somaNew is modified, so that one is a pointer
   Soma *somaNew = &cellParamsPtr->newCellState->soma;
   Soma somaPrev = cellParamsPtr->prevCellState->soma;
@@ -141,12 +139,4 @@ CUDA_CALLABLE_FUNCTION void _compSoma(CellCompParams *cellParamsPtr) {
 
   // Final computation
   somaNew->V_soma = somaCurrVolt(params);
-}
-
-void compSoma(CellCompParams *cellParamsPtr) {
-  _compSoma(cellParamsPtr);
-}
-
-__global__ void compSomaCUDA(CellCompParams *cellParamsPtr) {
-  _compSoma(cellParamsPtr);
 }
