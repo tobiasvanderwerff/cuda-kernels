@@ -211,21 +211,42 @@ void copyHostToDevice(
 __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount, mod_prec iApp, int simArrayId) {
   /* Update all cells in parallel. */
 
-  const size_t targetCell = blockIdx.x*blockDim.x + threadIdx.x;
+  const int targetCell = blockIdx.x*blockDim.x + threadIdx.x;
 
-  if (targetCell < cellCount) {
-    CellCompParams *currParams = &cellParamsPtr[targetCell];
+  // The reason we divide by 4 instead of 3 is that this way, all sequences of 4
+  // elements will be in the same block, and can synchronize. This is because 4
+  // will always be a multiple of the block size (assuming the block size is a
+  // power of 2!), whereas 3 is not. If you divide by 3, you could have a
+  // situation where e.g. the first 2 elements of a sequence are in block i, but
+  // the last element is in block i+1 (which means you can't synchronize them).
+  if (targetCell / 4 < cellCount) {
+    CellCompParams *currParams = &cellParamsPtr[targetCell / 4];
+    // TODO: move to shared memory?
+    // TODO: try coalesced access (ie strided)
 
     /* we simulate a hardcoded input pulse here
       * that differs from step to step
       */
-    currParams->iAppIn = iApp;
-    currParams->prevCellState = &cellPtr[simArrayId*cellCount + targetCell];
-    currParams->newCellState = &cellPtr[(simArrayId ^ 1)*cellCount + targetCell];
+    if (targetCell % 4 == 0) {
+      currParams->iAppIn = iApp;
+      currParams->prevCellState = &cellPtr[simArrayId*cellCount + targetCell/4];
+      currParams->newCellState = &cellPtr[(simArrayId ^ 1)*cellCount + targetCell/4];
+    }
 
-    compDendrite(currParams, 0);
-    compSoma(currParams);
-    compAxon(currParams);
+    __syncthreads();
+    switch (targetCell % 4) {
+      case 0:
+        compDendrite(currParams, 0);
+        break;
+      case 1:
+        compSoma(currParams);
+        break;
+      case 2:
+        compAxon(currParams);
+        break;
+      case 3:
+        break;
+    }
   }
 }
 
@@ -240,14 +261,11 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
                        int cellCount, int totalSimSteps) {
 
   const unsigned int gridDimComm = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
-  const unsigned int gridDimCell = CEILDIV(cellCount, CUDA_BLOCK_SIZE);
+  const unsigned int gridDimCell = CEILDIV(4*cellCount, CUDA_BLOCK_SIZE);
 
-  mod_prec iApp = 0;
   for (int simStep = 0; simStep < totalSimSteps; simStep++) {
     int simArrayId = simStep % 2;
-    if ((simStep >= 20000) && (simStep < 20500 - 1)) {
-      iApp = 6;
-    } 
+    mod_prec iApp = ((simStep >= 20000) && (simStep < 20500 - 1)) ? 6 : 0;
 
     /* Perform_Communication() performs the inter core
      * core dendrite communication with connected cells
