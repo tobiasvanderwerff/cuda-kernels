@@ -39,7 +39,7 @@ with open('serial/results/lastStateDump.txt') as f1, open('parallel/results/last
       print("Line lengths differ")
       break
 
-    if not all(math.isclose(v1, v2, rel_tol=1e-5) for v1, v2 in zip(values1, values2)):
+    if not all(math.isclose(v1, v2, rel_tol=1e-6) for v1, v2 in zip(values1, values2)):
       print("Values not close")
       close = False
       break
