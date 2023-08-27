@@ -114,8 +114,6 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
 
   // handle connectivity file parsing so that each cell knows what it needs
   printf("Reading Network Connectivity Data\n");
-  // TODO <TVDW>: I think this loop could be put on GPU, especially if I can
-  // keep the initialized data there
   for (int line_counter = 0; line_counter < cellCount; line_counter++) {
     for (int i = 0; i < cellCount; i++) {
       // this connection is considered not existing if conductance = 0
@@ -148,7 +146,7 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
   printf("int: %d, dend: %d, soma: %d, axon: %d, cellstate: %d\n", sizeof(int), sizeof(Dend), sizeof(Soma),
          sizeof(Axon), sizeof(CellState));
   // Initialise cellPtr[0] with appropriate values
-  initState(cellPtr[0], cellCount); // TODO <TVDW>: could be moved to GPU
+  initState(cellPtr[0], cellCount);
   if (G_CAL_FROM_FILE) {
     readGCalFromFile(cellPtr[0], cellCount);
   }
@@ -239,34 +237,30 @@ __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, 
  */
 // void performSimulation(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount, int totalSimSteps) {
 void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
-                       CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
                        int cellCount, int totalSimSteps) {
-  // TODO: eventually try to replace this entire loop with a parallelized version (?)
-  copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
+
+  const unsigned int gridDimComm = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
+  const unsigned int gridDimCell = CEILDIV(cellCount, CUDA_BLOCK_SIZE);
+
+  mod_prec iApp = 0;
   for (int simStep = 0; simStep < totalSimSteps; simStep++) {
-    mod_prec iApp;
     int simArrayId = simStep % 2;
     if ((simStep >= 20000) && (simStep < 20500 - 1)) {
       iApp = 6;
-    } else {
-      iApp = 0;
-    }
+    } 
 
     /* Perform_Communication() performs the inter core
      * core dendrite communication with connected cells
      * See definition for more details
      */
-    unsigned int gridDim = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
-    communicationStep<<<gridDim, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
+    communicationStep<<<gridDimComm, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
 
     cudaDeviceSynchronize();
 
-    gridDim = CEILDIV(cellCount, CUDA_BLOCK_SIZE);
-    update_cells<<<gridDim, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
+    update_cells<<<gridDimCell, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
 
     cudaDeviceSynchronize();
   }
-  copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
 }
 
 /**
@@ -287,8 +281,10 @@ void simulate(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
 
   int totalSimSteps = (int)(SIMTIME / DELTA);
 
-  // performSimulation(cellParamsPtr, cellPtr, cellCount, totalSimSteps);
-  performSimulation(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+  // Perform simulation
+  copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
+  performSimulation(cellParamsPtr_d, cellPtr_d, cellCount, totalSimSteps);
+  copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
 
   timestamp_t t1 = getTimeStamp();
   printf(

@@ -52,7 +52,6 @@ int main(int argc, char *argv[]) {
   // Init network
   char conFile[BUFF_SIZE];
   sprintf(conFile, CONFIG_FILE_NAME);
-  // TODO <TVDW>: Go over 'init' again after doing 'simulate'
   init(conFile, cellParamsPtr_h, cellPtr_h, cellCount);
 
   // CUDA Setup 
