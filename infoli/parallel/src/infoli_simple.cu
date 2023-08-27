@@ -41,13 +41,13 @@ CellState *allocAndCopyCellPtrCUDA(int cellCount, CellState** cellPtr) {
 
   const size_t rowsize = size_t(cellCount) * sizeof(CellState);
   err = cudaMalloc((void**) &cellPtr_d, 2*rowsize);
-  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  cudaSuccessOrExit(err);
   // Copy first row
   err = cudaMemcpy(cellPtr_d, cellPtr[0], rowsize, cudaMemcpyHostToDevice);
-  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  cudaSuccessOrExit(err);
   // Copy second row
   err = cudaMemcpy(cellPtr_d+cellCount, cellPtr[1], rowsize, cudaMemcpyHostToDevice);
-  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  cudaSuccessOrExit(err);
 
   return cellPtr_d;
 }
@@ -79,9 +79,9 @@ CellCompParams *allocAndCopyCellParamsCUDA(int cellCount, CellCompParams* cellPa
 
   const unsigned int memsize = cellCount * sizeof(CellCompParams);
   err = cudaMalloc((void**) &cellParamsPtr_d, memsize);
-  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  cudaSuccessOrExit(err);
   err = cudaMemcpy(cellParamsPtr_d, cellParamsPtr, memsize, cudaMemcpyHostToDevice);
-  cudaSuccessOrExit(err, __FILE__, __LINE__);
+  cudaSuccessOrExit(err);
 
   return cellParamsPtr_d;
 }
@@ -188,6 +188,28 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
   }
 }
 
+void copyDeviceToHost(
+    CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
+    CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
+    int cellCount, int totalSimSteps) {
+  // Copy device->host
+  cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
+  cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
+  cudaMemcpy(cellPtr_h[1], cellPtr_d+cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
+  cudaDeviceSynchronize();
+}
+
+
+void copyHostToDevice(
+    CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
+    CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
+    int cellCount, int totalSimSteps) {
+  cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
+  cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
+  cudaMemcpy(cellPtr_d+cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
+  cudaDeviceSynchronize();
+}
+
 /**
  * MAIN Loop
  *
@@ -218,11 +240,9 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
 
     cudaDeviceSynchronize();
 
-    // Copy device data back to host 
-    cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
-    cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
-    cudaMemcpy(cellPtr_h[1], cellPtr_d+cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
-    cudaDeviceSynchronize();
+    // TODO: eventually try to replace this entire loop with a parallelized version 
+
+    copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
     for (int targetCell = 0; targetCell < cellCount; targetCell++) {
       CellCompParams *currParams = &cellParamsPtr_h[targetCell];
@@ -234,15 +254,20 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
       currParams->prevCellState = &cellPtr_h[simArrayId][targetCell];
       currParams->newCellState = &cellPtr_h[simArrayId ^ 1][targetCell];
 
-      compDendrite(currParams, 0);
+      copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+
+      // TODO: set gridDim and blockDim to proper values
+      compDendriteCUDA<<<gridDim, blockDim>>>(currParams, 0);
+
+      copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+
+      // compDendrite(currParams, 0);
       compSoma(currParams);
       compAxon(currParams);
+
     }
-    // Copy data from host to device for next loop iteration
-    cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
-    cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
-    cudaMemcpy(cellPtr_d+cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
-    cudaDeviceSynchronize();
+    // Copy host->device
+    copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
   }
 }
 

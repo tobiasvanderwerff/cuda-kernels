@@ -21,7 +21,7 @@ timestamp_t getTimeStamp() {
   return now.tv_usec + (timestamp_t)now.tv_sec * 1000000;
 }
 
-void cudaSuccessOrExit(cudaError_t err, const char* file, int line) {
+void cudaSuccessOrExit_(cudaError_t err, const char* file, int line) {
   if (err != cudaSuccess) {
     fprintf(stderr, "CUDA Error at %s:%d: %s\n",
             file, line, cudaGetErrorString(err));

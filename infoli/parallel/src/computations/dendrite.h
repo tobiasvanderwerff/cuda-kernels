@@ -47,3 +47,4 @@ typedef struct DendCurrVoltParams {
 } DendCurrVoltParams;
 
 void compDendrite(CellCompParams *cellParamsPtr, int randomness);
+__global__ void compDendriteCUDA(CellCompParams *cellParamsPtr, int randomness);
