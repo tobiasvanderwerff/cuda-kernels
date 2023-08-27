@@ -1,6 +1,8 @@
 #include "soma.h"
 
-mod_prec somaCalciumK(mod_prec prevV_soma, mod_prec prevCalcium_k) {
+#define CUDA_CALLABLE_FUNCTION __host__ __device__
+
+CUDA_CALLABLE_FUNCTION mod_prec somaCalciumK(mod_prec prevV_soma, mod_prec prevCalcium_k) {
   mod_prec k_inf = (1 / (1 + exp(-1 * (prevV_soma + 61) / 4.2)));
   mod_prec tau_k = 1;
   mod_prec dk_dt = (k_inf - prevCalcium_k) / tau_k;
@@ -8,7 +10,7 @@ mod_prec somaCalciumK(mod_prec prevV_soma, mod_prec prevCalcium_k) {
   return k_local;
 }
 
-mod_prec somaCalciumL(mod_prec prevV_soma, mod_prec prevCalcium_l) {
+CUDA_CALLABLE_FUNCTION mod_prec somaCalciumL(mod_prec prevV_soma, mod_prec prevCalcium_l) {
   mod_prec l_inf = (1 / (1 + exp((prevV_soma + 85.5) / 8.5)));
   mod_prec tau_l = ((20 * exp((prevV_soma + 160) / 30) / (1 + exp((prevV_soma + 84) / 7.3))) + 35);
   mod_prec dl_dt = (l_inf - prevCalcium_l) / tau_l;
@@ -16,14 +18,14 @@ mod_prec somaCalciumL(mod_prec prevV_soma, mod_prec prevCalcium_l) {
   return l_local;
 }
 
-mod_prec somaSodiumM(mod_prec prevV_soma) {
+CUDA_CALLABLE_FUNCTION mod_prec somaSodiumM(mod_prec prevV_soma) {
   // RAT THALAMOCORTICAL SODIUM:
   mod_prec m_inf = 1 / (1 + (exp((-30 - prevV_soma) / 5.5)));
   mod_prec m_local = m_inf;
   return m_local;
 }
 
-mod_prec somaSodiumH(mod_prec prevV_soma, mod_prec prevSodium_h) {
+CUDA_CALLABLE_FUNCTION mod_prec somaSodiumH(mod_prec prevV_soma, mod_prec prevSodium_h) {
   // RAT THALAMOCORTICAL SODIUM:
   mod_prec h_inf = 1 / (1 + (exp((-70 - prevV_soma) / -5.8)));
   mod_prec tau_h = 3 * exp((-40 - prevV_soma) / 33);
@@ -32,7 +34,7 @@ mod_prec somaSodiumH(mod_prec prevV_soma, mod_prec prevSodium_h) {
   return h_local;
 }
 
-mod_prec somaPotassiumN(mod_prec prevV_soma, mod_prec prevPotassium_n) {
+CUDA_CALLABLE_FUNCTION mod_prec somaPotassiumN(mod_prec prevV_soma, mod_prec prevPotassium_n) {
   // NEOCORTICAL
   mod_prec n_inf = 1 / (1 + exp((-3 - prevV_soma) / 10));
   mod_prec tau_n = 5 + (47 * exp(-(-50 - prevV_soma) / 900));
@@ -41,7 +43,7 @@ mod_prec somaPotassiumN(mod_prec prevV_soma, mod_prec prevPotassium_n) {
   return n_local;
 }
 
-mod_prec somaPotassiumP(mod_prec prevV_soma, mod_prec prevPotassium_p) {
+CUDA_CALLABLE_FUNCTION mod_prec somaPotassiumP(mod_prec prevV_soma, mod_prec prevPotassium_p) {
   // NEOCORTICAL
   mod_prec p_inf = 1 / (1 + exp((-51 - prevV_soma) / -12));
   mod_prec tau_p = 5 + (47 * exp(-(-50 - prevV_soma) / 900));
@@ -50,7 +52,7 @@ mod_prec somaPotassiumP(mod_prec prevV_soma, mod_prec prevPotassium_p) {
   return p_local;
 }
 
-mod_prec somaPotassiumX(mod_prec prevV_soma, mod_prec prevPotassium_x_s) {
+CUDA_CALLABLE_FUNCTION mod_prec somaPotassiumX(mod_prec prevV_soma, mod_prec prevPotassium_x_s) {
   // Voltage-dependent (fast) potassium
   mod_prec alpha_x_s = 0.13 * (prevV_soma + 25) / (1 - exp(-(prevV_soma + 25) / 10));
   mod_prec beta_x_s = 1.69 * exp(-0.0125 * (prevV_soma + 35));
@@ -61,7 +63,7 @@ mod_prec somaPotassiumX(mod_prec prevV_soma, mod_prec prevPotassium_x_s) {
   return x_s_local;
 }
 
-mod_prec somaCurrVolt(const SomaCurrVoltParams params) {
+CUDA_CALLABLE_FUNCTION mod_prec somaCurrVolt(const SomaCurrVoltParams params) {
   // Get inputs
   mod_prec g_CaL = params.g_CaL;
   mod_prec prevV_dend = params.vDend;
@@ -98,7 +100,7 @@ mod_prec somaCurrVolt(const SomaCurrVoltParams params) {
 
 // update somatic components
 // SCHWEIGHOFER:
-void compSoma(CellCompParams *cellParamsPtr) {
+CUDA_CALLABLE_FUNCTION void _compSoma(CellCompParams *cellParamsPtr) {
   // only somaNew is modified, so that one is a pointer
   Soma *somaNew = &cellParamsPtr->newCellState->soma;
   Soma somaPrev = cellParamsPtr->prevCellState->soma;
@@ -139,4 +141,12 @@ void compSoma(CellCompParams *cellParamsPtr) {
 
   // Final computation
   somaNew->V_soma = somaCurrVolt(params);
+}
+
+void compSoma(CellCompParams *cellParamsPtr) {
+  _compSoma(cellParamsPtr);
+}
+
+__global__ void compSomaCUDA(CellCompParams *cellParamsPtr) {
+  _compSoma(cellParamsPtr);
 }

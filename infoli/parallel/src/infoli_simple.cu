@@ -258,12 +258,14 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
 
       // TODO: set gridDim and blockDim to proper values
       compDendriteCUDA<<<gridDim, blockDim>>>(currParams, 0);
+      compSomaCUDA<<<gridDim, blockDim>>>(currParams);
+      compAxonCUDA<<<gridDim, blockDim>>>(currParams);
 
       copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 
       // compDendrite(currParams, 0);
-      compSoma(currParams);
-      compAxon(currParams);
+      // compSoma(currParams);
+      // compAxon(currParams);
 
     }
     // Copy host->device

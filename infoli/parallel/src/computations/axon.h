@@ -23,3 +23,4 @@ typedef struct AxonCurrVoltParams {
 } AxonCurrVoltParams;
 
 void compAxon(CellCompParams *cellParamsPtr);
+__global__ void compAxonCUDA(CellCompParams *cellParamsPtr);

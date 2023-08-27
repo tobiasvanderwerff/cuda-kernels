@@ -45,3 +45,4 @@ typedef struct SomaCurrVoltParams {
 } SomaCurrVoltParams;
 
 void compSoma(CellCompParams *cellParamsPtr);
+__global__ void compSomaCUDA(CellCompParams *cellParamsPtr);

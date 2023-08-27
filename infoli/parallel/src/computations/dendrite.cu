@@ -1,6 +1,8 @@
 #include "dendrite.h"
 
-__host__ __device__ mod_prec dendHCurr(mod_prec prevV_dend, mod_prec prevHcurrent_q) {
+#define CUDA_CALLABLE_FUNCTION __host__ __device__
+
+CUDA_CALLABLE_FUNCTION mod_prec dendHCurr(mod_prec prevV_dend, mod_prec prevHcurrent_q) {
   // Update dendritic H current component
   mod_prec q_inf = 1 / (1 + exp((prevV_dend + 80) / 4));
   mod_prec tau_q = 1 / (exp(-0.086 * prevV_dend - 14.6) + exp(0.070 * prevV_dend - 1.87));
@@ -9,7 +11,7 @@ __host__ __device__ mod_prec dendHCurr(mod_prec prevV_dend, mod_prec prevHcurren
   return q_local;
 }
 
-__host__ __device__ mod_prec dendCaCurr(mod_prec prevV_dend, mod_prec prevCalcium_r) {
+CUDA_CALLABLE_FUNCTION mod_prec dendCaCurr(mod_prec prevV_dend, mod_prec prevCalcium_r) {
   // Update dendritic high-threshold Ca current component
   mod_prec alpha_r = 1.7 / (1 + exp(-(prevV_dend - 5) / 13.9));
   mod_prec beta_r = 0.02 * (prevV_dend + 8.5) / (exp((prevV_dend + 8.5) / 5) - 1);
@@ -20,7 +22,7 @@ __host__ __device__ mod_prec dendCaCurr(mod_prec prevV_dend, mod_prec prevCalciu
   return r_local;
 }
 
-__host__ __device__ mod_prec dendKCurr(mod_prec prevPotassium_s, mod_prec prevCa2Plus) {
+CUDA_CALLABLE_FUNCTION mod_prec dendKCurr(mod_prec prevPotassium_s, mod_prec prevCa2Plus) {
   // Update dendritic Ca-dependent K current component
   mod_prec alpha_s = min((0.00002 * prevCa2Plus), 0.01);
   mod_prec beta_s = 0.015;
@@ -33,7 +35,7 @@ __host__ __device__ mod_prec dendKCurr(mod_prec prevPotassium_s, mod_prec prevCa
 
 // Consider merging cal into kCurr since cal's output doesn't go to currVolt but
 // to kCurr
-__host__ __device__ mod_prec dendCal(mod_prec prevCa2Plus, mod_prec prevI_CaH) {
+CUDA_CALLABLE_FUNCTION mod_prec dendCal(mod_prec prevCa2Plus, mod_prec prevI_CaH) {
   // update Calcium concentration
   mod_prec dCa_dt = -3 * prevI_CaH - 0.075 * prevCa2Plus;
   mod_prec Ca2Plus_local = DELTA * dCa_dt + prevCa2Plus;
@@ -41,7 +43,7 @@ __host__ __device__ mod_prec dendCal(mod_prec prevCa2Plus, mod_prec prevI_CaH) {
 }
 
 // TODO: could parallelize this
-__host__ __device__ mod_prec icNeighbours(mod_prec *neighVdend, mod_prec *neighConductances, mod_prec prevV_dend, int neighbors) {
+CUDA_CALLABLE_FUNCTION mod_prec icNeighbours(mod_prec *neighVdend, mod_prec *neighConductances, mod_prec prevV_dend, int neighbors) {
   mod_prec I_c = 0;
   for (int i = 0; i < neighbors; i++) {
     mod_prec V = prevV_dend - neighVdend[i];
@@ -53,14 +55,14 @@ __host__ __device__ mod_prec icNeighbours(mod_prec *neighVdend, mod_prec *neighC
   return I_c;
 }
 
-__host__ __device__ mod_prec dendCICa(mod_prec prevV_dend, mod_prec r) {
+CUDA_CALLABLE_FUNCTION mod_prec dendCICa(mod_prec prevV_dend, mod_prec r) {
   // DENDRITIC CURRENTS
   // Inward high-threshold Ca current I_CaH
   mod_prec I_CaH = G_CAH * r * r * (prevV_dend - V_CA);
   return I_CaH;
 }
 
-__host__ __device__ mod_prec dendCurrVolt(const DendCurrVoltParams params) {
+CUDA_CALLABLE_FUNCTION mod_prec dendCurrVolt(const DendCurrVoltParams params) {
   // Get inputs
   mod_prec I_c = params.iC;
   mod_prec I_app = params.iApp;
@@ -86,7 +88,7 @@ __host__ __device__ mod_prec dendCurrVolt(const DendCurrVoltParams params) {
   return DELTA * dVd_dt + prevV_dend;
 }
 
-__device__ __host__ void _compDendrite(CellCompParams *cellParamsPtr, const int randomness) {
+CUDA_CALLABLE_FUNCTION void _compDendrite(CellCompParams *cellParamsPtr, const int randomness) {
   // only dendNew is modified, so that one is a pointer
   Dend *dendNew = &cellParamsPtr->newCellState->dend;
   Dend dendPrev = cellParamsPtr->prevCellState->dend;
@@ -131,7 +133,7 @@ __device__ __host__ void _compDendrite(CellCompParams *cellParamsPtr, const int 
   params.s = dendNew->Potassium_s;
   params.I_CaH = dendNew->I_CaH;
 
-  // // Final computation
+  // Final computation
   dendNew->V_dend = dendCurrVolt(params);
 }
 

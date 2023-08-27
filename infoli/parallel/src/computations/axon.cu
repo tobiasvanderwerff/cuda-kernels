@@ -1,6 +1,8 @@
 #include "axon.h"
 
-mod_prec axonSodiumH(mod_prec prevV_axon, mod_prec prevSodium_h_a) {
+#define CUDA_CALLABLE_FUNCTION __host__ __device__
+
+CUDA_CALLABLE_FUNCTION mod_prec axonSodiumH(mod_prec prevV_axon, mod_prec prevSodium_h_a) {
   // Update axonal Na components
   // NOTE: current has shortened inactivation to account for high
   // firing frequencies in axon hillock
@@ -12,13 +14,13 @@ mod_prec axonSodiumH(mod_prec prevV_axon, mod_prec prevSodium_h_a) {
   return h_a_local;
 }
 
-mod_prec axonSodiumM(mod_prec prevV_axon) {
+CUDA_CALLABLE_FUNCTION mod_prec axonSodiumM(mod_prec prevV_axon) {
   // keep separate variable for readability sake
   mod_prec m_inf_a = 1 / (1 + (exp((-30 - prevV_axon) / 5.5)));
   return m_inf_a;
 }
 
-mod_prec axonPotassium(mod_prec prevV_axon, mod_prec prevPotassium_x_a) {
+CUDA_CALLABLE_FUNCTION mod_prec axonPotassium(mod_prec prevV_axon, mod_prec prevPotassium_x_a) {
   // D'ANGELO 2001 -- Voltage-dependent potassium
   mod_prec alpha_x_a = 0.13 * (prevV_axon + 25) / (1 - exp(-(prevV_axon + 25) / 10));
   mod_prec beta_x_a = 1.69 * exp(-0.0125 * (prevV_axon + 35));
@@ -31,7 +33,7 @@ mod_prec axonPotassium(mod_prec prevV_axon, mod_prec prevPotassium_x_a) {
   return x_a_local;
 }
 
-mod_prec axonCurrVolt(const AxonCurrVoltParams params) {
+CUDA_CALLABLE_FUNCTION mod_prec axonCurrVolt(const AxonCurrVoltParams params) {
   // Get inputs
   mod_prec prevV_soma = params.vSoma;
   mod_prec prevV_axon = params.vAxon;
@@ -55,7 +57,7 @@ mod_prec axonCurrVolt(const AxonCurrVoltParams params) {
 
 // update somatic components
 // SCHWEIGHOFER:
-void compAxon(CellCompParams *cellParamsPtr) {
+CUDA_CALLABLE_FUNCTION void _compAxon(CellCompParams *cellParamsPtr) {
   // only axonNew is modified, so that one is a pointer
   Axon *axonNew = &cellParamsPtr->newCellState->axon;
   Axon axonPrev = cellParamsPtr->prevCellState->axon;
@@ -80,4 +82,12 @@ void compAxon(CellCompParams *cellParamsPtr) {
 
   // Final computation
   axonNew->V_axon = axonCurrVolt(params);
+}
+
+void compAxon(CellCompParams *cellParamsPtr) {
+  _compAxon(cellParamsPtr);
+}
+
+__global__ void compAxonCUDA(CellCompParams *cellParamsPtr) {
+  _compAxon(cellParamsPtr);
 }
