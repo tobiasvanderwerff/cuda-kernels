@@ -222,9 +222,7 @@ __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, 
   // but the last element is in block i+1 (which means you can't synchronize
   // them).
   if (targetCell / 4 < cellCount) {
-    CellCompParams *currParams = &cellParamsPtr[targetCell / 4];
-    // TODO: move to shared memory?
-    // TODO: try coalesced access (ie strided)
+    CellCompParams *currParams = &cellParamsPtr[targetCell / 4];  // multicast occurs
 
     /* we simulate a hardcoded input pulse here
       * that differs from step to step
