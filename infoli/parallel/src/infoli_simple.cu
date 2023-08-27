@@ -195,7 +195,7 @@ void copyDeviceToHost(
   // Copy device->host
   cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
   cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
-  cudaMemcpy(cellPtr_h[1], cellPtr_d+cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
+  cudaMemcpy(cellPtr_h[1], cellPtr_d + cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
 }
 
@@ -206,7 +206,7 @@ void copyHostToDevice(
     int cellCount) {
   cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
   cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
-  cudaMemcpy(cellPtr_d+cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
+  cudaMemcpy(cellPtr_d + cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
   cudaDeviceSynchronize();
 }
 
@@ -242,7 +242,7 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
                        CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
                        int cellCount, int totalSimSteps) {
   // TODO: eventually try to replace this entire loop with a parallelized version (?)
-  copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+  copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
   for (int simStep = 0; simStep < totalSimSteps; simStep++) {
     mod_prec iApp;
     int simArrayId = simStep % 2;
@@ -256,19 +256,17 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
      * core dendrite communication with connected cells
      * See definition for more details
      */
-    unsigned int blockDim = CUDA_BLOCK_SIZE;
-    unsigned int gridDim = CEILDIV(cellCount*cellCount, blockDim);
-    communicationStep<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
+    unsigned int gridDim = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
+    communicationStep<<<gridDim, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
 
     cudaDeviceSynchronize();
 
-    blockDim = CUDA_BLOCK_SIZE;
-    gridDim = CEILDIV(cellCount, blockDim);
-    update_cells<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
+    gridDim = CEILDIV(cellCount, CUDA_BLOCK_SIZE);
+    update_cells<<<gridDim, CUDA_BLOCK_SIZE>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
 
     cudaDeviceSynchronize();
   }
-  copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
+  copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
 }
 
 /**

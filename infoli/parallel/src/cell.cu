@@ -62,7 +62,6 @@ __global__ void communicationStep(CellCompParams *params, const CellState *cells
 
   if (row < cellCount) {
     CellCompParams param = params[row];
-    // TODO: use shared memory for this?
     if (col < param.total_amount_of_neighbours)
       param.neighVdend[col] = cells[param.neighId[col]].dend.V_dend;
   }
