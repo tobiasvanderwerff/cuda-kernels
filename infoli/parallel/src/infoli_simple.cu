@@ -211,8 +211,8 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
      * core dendrite communication with connected cells
      * See definition for more details
      */
-    unsigned int gridDim = BLOCK_SIZE;
-    unsigned int blockDim = cellCount * cellCount;
+    unsigned int gridDim = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
+    unsigned int blockDim = CUDA_BLOCK_SIZE;
     communicationStep<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
     // communicationStep(cellParamsPtr, cellPtr[simArrayId], cellCount);
 

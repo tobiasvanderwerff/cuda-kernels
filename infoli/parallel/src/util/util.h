@@ -25,10 +25,11 @@
 #include <stdlib.h>
 
 #define MIN(A, B) A > B ? B : A
+#define CEILDIV(A, B) (A-1)/B + 1
 #define BUFF_SIZE 100
 
 // CUDA block size
-#define BLOCK_SIZE 512
+#define CUDA_BLOCK_SIZE 512
 
 // typedef double mod_prec;
 // BE VERY CAREFUL TO CHECK ALL SCANFS TO BE SURE YOU SCAN FOR DOUBLE-POINT
