@@ -191,7 +191,7 @@ void init(const char *conFile, CellCompParams *cellParamsPtr, CellState **cellPt
 void copyDeviceToHost(
     CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
     CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
-    int cellCount, int totalSimSteps) {
+    int cellCount) {
   // Copy device->host
   cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
   cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
@@ -203,7 +203,7 @@ void copyDeviceToHost(
 void copyHostToDevice(
     CellCompParams *cellParamsPtr_d, CellState *cellPtr_d, 
     CellCompParams *cellParamsPtr_h, CellState **cellPtr_h,
-    int cellCount, int totalSimSteps) {
+    int cellCount) {
   cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
   cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
   cudaMemcpy(cellPtr_d+cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
@@ -256,42 +256,17 @@ void performSimulation(CellCompParams *cellParamsPtr_d, CellState *cellPtr_d,
      * core dendrite communication with connected cells
      * See definition for more details
      */
-    unsigned int gridDim = CEILDIV(cellCount*cellCount, CUDA_BLOCK_SIZE);
     unsigned int blockDim = CUDA_BLOCK_SIZE;
+    unsigned int gridDim = CEILDIV(cellCount*cellCount, blockDim);
     communicationStep<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d + simArrayId*cellCount, cellCount);
-    // communicationStep(cellParamsPtr, cellPtr[simArrayId], cellCount);
 
     cudaDeviceSynchronize();
 
-    // copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
-
-    // TODO: set gridDim and blockDim to proper values
+    blockDim = CUDA_BLOCK_SIZE;
+    gridDim = CEILDIV(cellCount, blockDim);
     update_cells<<<gridDim, blockDim>>>(cellParamsPtr_d, cellPtr_d, cellCount, iApp, simArrayId);
 
-    // for (int targetCell = 0; targetCell < cellCount; targetCell++) {
-    //   CellCompParams *currParams = &cellParamsPtr_h[targetCell];
-
-    //   /* we simulate a hardcoded input pulse here
-    //    * that differs from step to step
-    //    */
-    //   currParams->iAppIn = iApp;
-    //   currParams->prevCellState = &cellPtr_h[simArrayId][targetCell];
-    //   currParams->newCellState = &cellPtr_h[simArrayId ^ 1][targetCell];
-
-    //   copyHostToDevice(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
-
-    //   // TODO: set gridDim and blockDim to proper values
-    //   compDendriteCUDA<<<gridDim, blockDim>>>(currParams, 0);
-    //   compSomaCUDA<<<gridDim, blockDim>>>(currParams);
-    //   compAxonCUDA<<<gridDim, blockDim>>>(currParams);
-
-    //   copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
-
-    //   // compDendrite(currParams, 0);
-    //   // compSoma(currParams);
-    //   // compAxon(currParams);
-
-    // }
+    cudaDeviceSynchronize();
   }
   copyDeviceToHost(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount, totalSimSteps);
 }

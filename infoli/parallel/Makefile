@@ -7,7 +7,8 @@ MAIN= infoli_simple
 CC= nvcc
 
 # define any compile-time flags
-CFLAGS= -O3 -pg --relocatable-device-code=true
+CFLAGS= -O3 --relocatable-device-code=true
+#CFLAGS= -O3 -pg --relocatable-device-code=true
 
 # define any libraries to link into executable
 LIBS= -lm

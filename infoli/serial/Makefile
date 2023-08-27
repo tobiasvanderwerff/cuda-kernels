@@ -7,7 +7,8 @@ MAIN= infoli_simple
 CC= nvcc
 
 # define any compile-time flags
-CFLAGS= -O3 -pg
+CFLAGS= -O3
+#CFLAGS= -O3 -pg
 
 # define any libraries to link into executable
 LIBS= -lm
