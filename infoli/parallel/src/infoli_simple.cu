@@ -21,12 +21,21 @@ CellState **allocCellPtr(int cellCount) {
     exit(EXIT_FAILURE);
   }
 
-  cellPtr[0] = (CellState *)malloc(cellCount * sizeof(CellState));
-  cellPtr[1] = (CellState *)malloc(cellCount * sizeof(CellState));
-  if ((!cellPtr[0]) || (!cellPtr[1])) {
-    printf("Error: Couldn't malloc the array for CellStates\n");
-    exit(EXIT_FAILURE);
-  }
+  // Instead of using 'malloc', allocate page-locked memory using `cudaHostAlloc`
+  cudaError_t cuda_ret;
+  CellState *cellPtr0, *cellPtr1;
+  cuda_ret = cudaHostAlloc((void**) &cellPtr0, cellCount * sizeof(CellState), cudaHostAllocDefault);
+  cudaSuccessOrExit(cuda_ret);
+  cuda_ret = cudaHostAlloc((void**) &cellPtr1, cellCount * sizeof(CellState), cudaHostAllocDefault);
+  cudaSuccessOrExit(cuda_ret);
+  cellPtr[0] = cellPtr0;
+  cellPtr[1] = cellPtr1;
+  // cellPtr[0] = (CellState *)malloc(cellCount * sizeof(CellState));
+  // cellPtr[1] = (CellState *)malloc(cellCount * sizeof(CellState));
+  // if ((!cellPtr[0]) || (!cellPtr[1])) {
+  //   printf("Error: Couldn't malloc the array for CellStates\n");
+  //   exit(EXIT_FAILURE);
+  // }
   return cellPtr;
 }
 
@@ -53,7 +62,7 @@ CellState *allocAndCopyCellPtrCUDA(int cellCount, CellState** cellPtr) {
 }
 
 /**
- * Allocates memory for the cellParamsPtr
+ * Allocates memory for the cellParamsPtr using page-locked memory
  *
  * CellCompParams struct is used to update a cell state.
  * It contains the current flowing to this specific cell
@@ -65,11 +74,12 @@ CellState *allocAndCopyCellPtrCUDA(int cellCount, CellState** cellPtr) {
  */
 CellCompParams *allocCellParams(int cellCount) {
   CellCompParams *cellParamsPtr;
-  cellParamsPtr = (CellCompParams *)malloc(cellCount * sizeof(CellCompParams));
-  if (cellParamsPtr == NULL) {
-    printf("Error: Couldn't malloc for cellParamsPtr\n");
-    exit(EXIT_FAILURE);
-  }
+  cudaError_t cuda_ret;
+  // Use page-locked memory on the host for faster transfer
+  cuda_ret = cudaHostAlloc((void **) &cellParamsPtr, 
+                           cellCount * sizeof(CellCompParams),
+                           cudaHostAllocDefault);
+  cudaSuccessOrExit(cuda_ret);
   return cellParamsPtr;
 }
 

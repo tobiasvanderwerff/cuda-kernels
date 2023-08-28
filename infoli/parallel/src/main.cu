@@ -64,12 +64,13 @@ int main(int argc, char *argv[]) {
   // simulate(cellParamsPtr, cellPtr, cellCount);
   simulate(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);
 
-  // Clean up
-  free(cellPtr_h[0]);
-  free(cellPtr_h[1]);
+  // Clean up host memory
+  cudaFreeHost(cellPtr_h[0]);
+  cudaFreeHost(cellPtr_h[1]);
   free(cellPtr_h);
-  free(cellParamsPtr_h);
+  cudaFreeHost(cellParamsPtr_h);
 
+  // Clean up device memory
   cudaFree(cellPtr_d);
   cudaFree(cellParamsPtr_d);
 
