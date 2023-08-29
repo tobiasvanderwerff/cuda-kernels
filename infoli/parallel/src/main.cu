@@ -58,8 +58,6 @@ int main(int argc, char *argv[]) {
   CellState* cellPtr_d = allocAndCopyCellPtrCUDA(cellCount, cellPtr_h);
   CellCompParams* cellParamsPtr_d = allocAndCopyCellParamsCUDA(cellCount, cellParamsPtr_h);
 
-  cudaDeviceSynchronize();
-
   // Perform simulation
   // simulate(cellParamsPtr, cellPtr, cellCount);
   simulate(cellParamsPtr_d, cellPtr_d, cellParamsPtr_h, cellPtr_h, cellCount);

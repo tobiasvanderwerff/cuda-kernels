@@ -204,7 +204,6 @@ void copyDeviceToHost(
   cudaMemcpy(cellParamsPtr_h, cellParamsPtr_d, cellCount * sizeof(CellCompParams), cudaMemcpyDeviceToHost);
   cudaMemcpy(cellPtr_h[0], cellPtr_d, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
   cudaMemcpy(cellPtr_h[1], cellPtr_d + cellCount, cellCount * sizeof(CellState), cudaMemcpyDeviceToHost);
-  cudaDeviceSynchronize();
 }
 
 
@@ -215,7 +214,6 @@ void copyHostToDevice(
   cudaMemcpy(cellParamsPtr_d, cellParamsPtr_h, cellCount * sizeof(CellCompParams), cudaMemcpyHostToDevice);
   cudaMemcpy(cellPtr_d, cellPtr_h[0], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
   cudaMemcpy(cellPtr_d + cellCount, cellPtr_h[1], cellCount * sizeof(CellState), cudaMemcpyHostToDevice);
-  cudaDeviceSynchronize();
 }
 
 __global__ void update_cells(CellCompParams *cellParamsPtr, CellState *cellPtr, int cellCount, mod_prec iApp, int simArrayId) {
